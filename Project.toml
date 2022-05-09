@@ -12,6 +12,7 @@ Term = "22787eb5-b846-44ae-b979-8e399b8463ab"
 
 [compat]
 CircularArrayBuffers = "0.1"
+MLUtils = "0.2"
 Term = "0.3"
 julia = "1.6"
 
