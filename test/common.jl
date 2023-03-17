@@ -94,6 +94,22 @@ end
     @test batch.terminal == Bool[0, 0, 0] |> gpu
 end
 
+@testset "CircularArraySARTTraces handle missingness" begin
+    t = CircularArraySARTTraces(;
+        capacity=3,
+        state=Float32 => (2, 3),
+        action=Float32 => (2,),
+        reward=Float32 => (),
+        terminal=Bool => ()
+    )
+    push!(t, (; state=1, action=1, reward=missing, terminal=missing))
+    @test length(t) == 0
+    push!(t, (; state=1, action=1, reward=1.0, terminal=false))
+    @test length(t) == 1
+end
+
+
+
 @testset "ElasticArraySARTTraces" begin
     t = ElasticArraySARTTraces(;
         state=Float32 => (2, 3),
