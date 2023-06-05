@@ -152,45 +152,40 @@ export NStepBatchSampler
 
 mutable struct NStepBatchSampler{traces}
     n::Int # !!! n starts from 1
-    γ::Float32
     batch_size::Int
-    stack_size::Union{Nothing,Int}
+    stack_size::Int
     rng::Any
 end
 
 NStepBatchSampler(; kw...) = NStepBatchSampler{SS′ART}(; kw...)
-NStepBatchSampler{names}(; n, γ, batch_size=32, stack_size=nothing, rng=Random.GLOBAL_RNG) where {names} = NStepBatchSampler{names}(n, γ, batch_size, stack_size, rng)
+NStepBatchSampler{names}(; n, batch_size=32, stack_size=1, rng=Random.GLOBAL_RNG) where {names} = NStepBatchSampler{names}(n, γ, batch_size, stack_size, rng)
 
 function sample(sampler::NStepBatchSampler{names}, trajectory) where {names}
-    valid_range = isnothing(sampler.stack_size) ? (1:(length(trajectory)-sampler.n+1)) : (sampler.stack_size:(length(trajectory)-sampler.n+1))# think about the exteme case where s.stack_size == 1 and s.n == 1
+    valid_range = sampler.stack_size:(length(trajectory)-sampler.n+1)# think about the exteme case where s.stack_size == 1 and s.n == 1
     inds = rand(sampler.rng, valid_range, sampler.batch_size)
-    sample(sampler, trajectory, Val(names), inds)
+    sample(sampler, trajectory.traces, Val(names), inds)
 end
 
-function sample(sampler::NStepBatchSampler, trajectory, ::Val{SS′ART}, inds)
-    if isnothing(sampler.stack_size)
-        s = trajectory[:state][inds]
-        s′ = trajectory[:next_state][inds.+(sampler.n-1)]
-    else
-        s = trajectory[:state][[x + i for i in -sampler.stack_size+1:0, x in inds]]
-        s′ = trajectory[:next_state][[x + sampler.n - 1 + i for i in -sampler.stack_size+1:0, x in inds]]
-    end
+function sample(sampler::NStepBatchSampler, traces, ::Val{SS′ART}, inds)
+    ranges, state_ranges = truncated_ranges(sampler,traces,inds)
+    s = [collect(traces[:state][r]) for r in state_ranges]
+    s′ = [traces[:next_state][last(r)] for r in state_ranges] #only fetch the last state as the other "next state" are already in `s`
+    a = [collect(traces[:action][r]) for r in ranges]
+    t = [collect(traces[:terminal][r]) for r in ranges]
+    r = [collect(traces[:reward][r]) for r in ranges]
 
-    a = trajectory[:action][inds]
-    t_horizon = trajectory[:terminal][[x + j for j in 0:sampler.n-1, x in inds]]
-    r_horizon = trajectory[:reward][[x + j for j in 0:sampler.n-1, x in inds]]
-
-    r = map(eachcol(r_horizon), eachcol(t_horizon)) do r⃗, t⃗
-        foldr(((rr, tt), init) -> rr + sampler.γ * init * (1 - tt), zip(r⃗, t⃗); init=0.0f0)
-    end
-
-    NamedTuple{SS′ART}(map(collect, (s, s′, a, r, t)))
+    NamedTuple{SS′ART}((s, s′, a, r, t))
 end
 
-function sample(s::NStepBatchSampler, ts, ::Val{SS′L′ART}, inds)
-    s, s′, a, r, t = sample(s, ts, Val(SSART), inds)
-    l = consecutive_view(ts[:next_legal_actions_mask], inds)
-    NamedTuple{SSLART}(map(collect, (s, s′, l, a, r, t)))
+function sample(sampler::NStepBatchSampler, traces, ::Val{SS′L′ART}, inds)
+    ranges, state_ranges = truncated_ranges(sampler, traces, inds)
+    s = [collect(traces[:state][r]) for r in state_ranges]
+    s′ = [traces[:next_state][last(r)] for r in state_ranges] #only fetch the last state as the other "next state" are already in `s`
+    a = [collect(traces[:action][r]) for r in ranges]
+    t = [collect(traces[:terminal][r]) for r in ranges]
+    r = [collect(traces[:reward][r]) for r in ranges]
+    l = [collect(traces[:next_legal_actions_mask][r]) for r in ranges]
+    NamedTuple{SSLART}((s, s′, l, a, r, t))
 end
 
 function sample(s::NStepBatchSampler{names}, t::CircularPrioritizedTraces) where {names}
@@ -199,4 +194,28 @@ function sample(s::NStepBatchSampler{names}, t::CircularPrioritizedTraces) where
         (key=t.keys[inds], priority=priorities),
         sample(s, t.traces, Val(names), inds)
     )
+end
+
+function truncated_ranges(sampler, trajectory, inds)
+    #inds are the indices of the first state of the batch. For each idx in inds, we need the next n inds that belong to the same episode
+    truncated_ns = ones(Int, sampler.batch_size)
+    for (j, idx) in enumerate(inds)
+        for i in idx:idx+sampler.n-1
+            trajectory[:terminal][i] && break
+            truncated_ns[j] += 1
+        end
+    end
+    ranges = [idx:idx+n-1 for (idx,n) in zip(inds,truncated_ns)]
+
+    truncated_stack_sizes = ones(Int, sampler.batch_size)  #when stack_size is > 1, we must fetch past state-observations
+    if sampler.stack_size > 1
+        for (j,idx) in enumerate(inds)
+            for i in idx:-1:idx-sampler.stack_size+1
+                trajectory[:terminal][i] && break
+                truncated_stack_sizes[j] += 1
+            end
+        end
+    end
+    state_ranges = [idx-ss+1:idx+n-1 for (idx,n,ss) in zip(inds,truncated_ns,truncated_stack_sizes)]
+    return ranges, state_ranges
 end
