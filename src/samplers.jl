@@ -180,10 +180,8 @@ function sample(sampler::NStepBatchSampler, trajectory, ::Val{SS′ART}, inds)
     t_horizon = trajectory[:terminal][[x + j for j in 0:sampler.n-1, x in inds]]
     r_horizon = trajectory[:reward][[x + j for j in 0:sampler.n-1, x in inds]]
 
-    @assert ndims(t_horizon) == 2
     t = any(t_horizon, dims=1) |> vec
 
-    @assert ndims(r_horizon) == 2
     r = map(eachcol(r_horizon), eachcol(t_horizon)) do r⃗, t⃗
         foldr(((rr, tt), init) -> rr + sampler.γ * init * (1 - tt), zip(r⃗, t⃗); init=0.0f0)
     end
