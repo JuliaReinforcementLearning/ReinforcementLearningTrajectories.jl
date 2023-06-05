@@ -150,7 +150,7 @@ end
 
 export NStepBatchSampler
 
-mutable struct NStepBatchSampler{traces}
+struct NStepBatchSampler{traces}
     n::Int # !!! n starts from 1
     batch_size::Int
     stack_size::Int
