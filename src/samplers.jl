@@ -161,31 +161,31 @@ end
 NStepBatchSampler(; kw...) = NStepBatchSampler{SS′ART}(; kw...)
 NStepBatchSampler{names}(; n, γ, batch_size=32, stack_size=nothing, rng=Random.GLOBAL_RNG) where {names} = NStepBatchSampler{names}(n, γ, batch_size, stack_size, rng)
 
-function sample(s::NStepBatchSampler{names}, ts) where {names}
-    valid_range = isnothing(s.stack_size) ? (1:(length(ts)-s.n+1)) : (s.stack_size:(length(ts)-s.n+1))# think about the exteme case where s.stack_size == 1 and s.n == 1
-    inds = rand(s.rng, valid_range, s.batch_size)
-    sample(s, ts, Val(names), inds)
+function sample(sampler::NStepBatchSampler{names}, trajectory) where {names}
+    valid_range = isnothing(sampler.stack_size) ? (1:(length(trajectory)-sampler.n+1)) : (sampler.stack_size:(length(trajectory)-sampler.n+1))# think about the exteme case where s.stack_size == 1 and s.n == 1
+    inds = rand(sampler.rng, valid_range, sampler.batch_size)
+    sample(sampler, trajectory, Val(names), inds)
 end
 
-function sample(nbs::NStepBatchSampler, ts, ::Val{SS′ART}, inds)
-    if isnothing(nbs.stack_size)
-        s = ts[:state][inds]
-        s′ = ts[:next_state][inds.+(nbs.n-1)]
+function sample(sampler::NStepBatchSampler, trajectory, ::Val{SS′ART}, inds)
+    if isnothing(sampler.stack_size)
+        s = trajectory[:state][inds]
+        s′ = trajectory[:next_state][inds.+(sampler.n-1)]
     else
-        s = ts[:state][[x + i for i in -nbs.stack_size+1:0, x in inds]]
-        s′ = ts[:next_state][[x + nbs.n - 1 + i for i in -nbs.stack_size+1:0, x in inds]]
+        s = trajectory[:state][[x + i for i in -sampler.stack_size+1:0, x in inds]]
+        s′ = trajectory[:next_state][[x + sampler.n - 1 + i for i in -sampler.stack_size+1:0, x in inds]]
     end
 
-    a = ts[:action][inds]
-    t_horizon = ts[:terminal][[x + j for j in 0:nbs.n-1, x in inds]]
-    r_horizon = ts[:reward][[x + j for j in 0:nbs.n-1, x in inds]]
+    a = trajectory[:action][inds]
+    t_horizon = trajectory[:terminal][[x + j for j in 0:sampler.n-1, x in inds]]
+    r_horizon = trajectory[:reward][[x + j for j in 0:sampler.n-1, x in inds]]
 
     @assert ndims(t_horizon) == 2
     t = any(t_horizon, dims=1) |> vec
 
     @assert ndims(r_horizon) == 2
     r = map(eachcol(r_horizon), eachcol(t_horizon)) do r⃗, t⃗
-        foldr(((rr, tt), init) -> rr + nbs.γ * init * (1 - tt), zip(r⃗, t⃗); init=0.0f0)
+        foldr(((rr, tt), init) -> rr + sampler.γ * init * (1 - tt), zip(r⃗, t⃗); init=0.0f0)
     end
 
     NamedTuple{SS′ART}(map(collect, (s, s′, a, r, t)))
