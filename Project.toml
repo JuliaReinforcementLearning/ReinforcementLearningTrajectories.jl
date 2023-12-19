@@ -14,7 +14,7 @@ StackViews = "cae243ae-269e-4f55-b966-ac2d0dc13c15"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-Adapt = "3"
+Adapt = "3, 4"
 CircularArrayBuffers = "0.1"
 DataStructures = "0.18"
 ElasticArrays = "1"
