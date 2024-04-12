@@ -180,6 +180,7 @@ end
 function Traces(; kw...)
     data = map(x -> convert(AbstractTrace, x), values(kw))
     names = keys(data)
+    !(values(data) isa AbstractArray) || @error "Trace element type, `$(typeof(values(data)))`` is an `AbstractArray`, not an array element type, like `Float64`."
     Traces{names,typeof(data),length(names),typeof(values(data))}(data)
 end
 
