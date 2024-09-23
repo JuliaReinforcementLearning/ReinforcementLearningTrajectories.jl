@@ -200,7 +200,7 @@ function valid_range(s::NStepBatchSampler, eb::EpisodesBuffer)
     stacksize = isnothing(s.stacksize) ? 1 : s.stacksize 
     for idx in eachindex(range)
         step_number = eb.step_numbers[idx]
-        range[idx] = step_number >= stacksize && eb.sampleable_inds[idx]
+        range[idx] = step_number >= stacksize && eb.sampleable_inds[idx] && idx >= stacksize
         ns[idx] = min(s.n, eb.episodes_lengths[idx] - step_number + 1)
     end
     return range, ns
