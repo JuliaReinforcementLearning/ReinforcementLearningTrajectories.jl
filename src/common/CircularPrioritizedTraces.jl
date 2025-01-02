@@ -34,22 +34,6 @@ function Base.push!(t::CircularPrioritizedTraces, x)
     end
 end
 
-function Base.push!(t::CircularPrioritizedTraces{<:CircularArraySARTSATraces}, x)
-    initial_length = length(t.traces)
-    push!(t.traces, x)
-    if length(t.traces) == 1
-        push!(t.keys, 1)
-        push!(t.priorities, t.default_priority)
-    elseif length(t.traces) > 1 && (initial_length < length(t.traces) || initial_length == capacity(t.traces)-1 ) 
-        # only add a key if the length changes after insertion of the tuple
-        # or if the trace is already at capacity
-        push!(t.keys, t.keys[end] + 1)
-        push!(t.priorities, t.default_priority)
-    else
-        # may be partial inserting at the first step, ignore it
-    end
-end
-
 function Base.setindex!(t::CircularPrioritizedTraces, vs, k::Symbol, keys)
     if k === :priority
         @assert length(vs) == length(keys)

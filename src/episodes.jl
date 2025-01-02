@@ -43,15 +43,13 @@ end
 # Capacity of an EpisodesBuffer is the capacity of the underlying traces + 1 for certain cases
 function is_capacity_plus_one(traces::AbstractTraces)
     if any(t->t isa MultiplexTraces, traces.traces)
-        # MultiplexTraces buffer next_state and next_action, so we need to add one to the capacity
-        return true
-    elseif traces isa CircularPrioritizedTraces
-        # CircularPrioritizedTraces buffer next_state and next_action, so we need to add one to the capacity
+        # MultiplexTraces buffer next_state or next_action, so we need to add one to the capacity
         return true
     else
         false
     end
 end
+is_capacity_plus_one(traces::CircularPrioritizedTraces) = is_capacity_plus_one(traces.traces)
 
 function EpisodesBuffer(traces::AbstractTraces)
     cap = is_capacity_plus_one(traces) ? capacity(traces) + 1 : capacity(traces)
@@ -70,7 +68,7 @@ function EpisodesBuffer(traces::AbstractTraces)
 end
 
 function Base.getindex(es::EpisodesBuffer, idx::Int...)
-    @boundscheck all(es.sampleable_inds[idx...])
+    @boundscheck all(es.sampleable_inds[idx...]) || throw(BoundsError(es.sampleable_inds, idx))
     getindex(es.traces, idx...)
 end
 
@@ -79,6 +77,7 @@ function Base.getindex(es::EpisodesBuffer, idx...)
 end
 
 Base.setindex!(eb::EpisodesBuffer, idx...) = setindex!(eb.traces, idx...)
+capacity(eb::EpisodesBuffer) = capacity(eb.traces)
 Base.size(eb::EpisodesBuffer) = size(eb.traces)
 Base.length(eb::EpisodesBuffer) = length(eb.traces)
 Base.keys(eb::EpisodesBuffer) = keys(eb.traces)
@@ -146,7 +145,7 @@ function Base.push!(eb::EpisodesBuffer, xs::NamedTuple)
         push!(eb.episodes_lengths, 0)
         push!(eb.sampleable_inds, 0)
     elseif !partial #typical inserting
-        if haskey(eb,:next_action) && length(eb) < max_length(eb) # if trace has next_action and lengths are mismatched 
+        if haskey(eb,:next_action) # if trace has next_action
             if eb.step_numbers[end] > 1            # and if there are sufficient steps in the current episode
                 eb.sampleable_inds[end-1] = 1      # steps are indexable one step later
             end
@@ -172,28 +171,6 @@ end
 function Base.push!(eb::EpisodesBuffer, xs::PartialNamedTuple) #wrap a NamedTuple to push without incrementing the step number.
     push!(eb.traces, xs.namedtuple)
     eb.sampleable_inds[end-1] = 1 #completes the episode trajectory.
-end
-
-function Base.push!(eb::EpisodesBuffer{<:Any,<:Any,<:CircularArraySARTSATraces}, xs::PartialNamedTuple)
-    if max_length(eb) == capacity(eb.traces)
-        popfirst!(eb)
-    end
-    push!(eb.traces, xs.namedtuple)
-    eb.sampleable_inds[end-1] = 1 #completes the episode trajectory.
-end
-
-function Base.push!(eb::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces{<:CircularArraySARTSATraces}}, xs::PartialNamedTuple{@NamedTuple{action::Int64}})
-    if max_length(eb) == capacity(eb.traces)
-        addition = (name => zero(eltype(eb.traces[name])) for name in [:state, :reward, :terminal])
-        xs = merge(xs.namedtuple, addition)
-        push!(eb.traces, xs)
-        pop!(eb.traces[:state].trace)
-        pop!(eb.traces[:reward])
-        pop!(eb.traces[:terminal])
-    else
-        push!(eb.traces, xs.namedtuple)
-        eb.sampleable_inds[end-1] = 1
-    end
 end
 
 for f in (:pop!, :popfirst!)

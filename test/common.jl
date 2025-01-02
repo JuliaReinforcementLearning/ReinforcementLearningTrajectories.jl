@@ -180,14 +180,14 @@ end
         default_priority=1.0f0
     )
 
-    eb = EpisodesBuffer(t) 
+    eb = EpisodesBuffer(t)
     push!(eb, (state = 1, action = 1))
     for i = 1:5
-        push!(eb, (state = i+1, action =i+1, reward = i, terminal = false))
+        push!(eb, (state = i+1, action = i+1, reward = i, terminal = false))
     end
     push!(eb, (state = 7, action = 7))
     for (j,i) = enumerate(8:11)
-        push!(eb, (state = i, action =i, reward = i-1, terminal = false))
+        push!(eb, (state = i, action = i, reward = i-1, terminal = false))
     end
     s = BatchSampler(1000)
     b = sample(s, eb)
@@ -222,6 +222,8 @@ end
 
     b = sample(s, t)
 
+    @test t[:priority] == [1.0f0, 1.0f0, 1.0f0]
+
     t[:priority, [1, 2]] = [0, 0]
 
     # shouldn't be changed since [1,2] are old keys
@@ -240,18 +242,19 @@ end
         ),
         default_priority=1.0f0
     )
-    
-    eb = EpisodesBuffer(t) 
+
+    eb = EpisodesBuffer(t)
     push!(eb, (state = 1,))
     for i = 1:5
-        push!(eb, (state = i+1, action =i, reward = i, terminal = false))
+        push!(eb, (state = i+1, action = i, reward = i, terminal = false))
     end
     push!(eb, PartialNamedTuple((action = 6,)))
     push!(eb, (state = 7,))
-    for (j,i) = enumerate(8:11)
-        push!(eb, (state = i, action =i-1, reward = i-1, terminal = false))
+    for i = 8:11
+        push!(eb, (state = i, action = i-1, reward = i-1, terminal = false))
     end
-    push!(eb, PartialNamedTuple((action=12,)))
+    push!(eb, PartialNamedTuple((action=11,)))
+
     s = BatchSampler(1000)
     b = sample(s, eb)
     cm = counter(b[:state])
