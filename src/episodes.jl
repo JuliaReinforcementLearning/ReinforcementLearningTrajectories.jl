@@ -5,9 +5,9 @@ using ElasticArrays: ElasticArray, ElasticVector
 """
     EpisodesBuffer(traces::AbstractTraces)
 
-Wraps an `AbstractTraces` object, usually the container of a `Trajectory`. 
+Wraps an `AbstractTraces` object, usually the container of a `Trajectory`.
 `EpisodesBuffer` tracks the indexes of the `traces` object that belong to the same episodes.
-To that end, it stores 
+To that end, it stores
 1. an vector `sampleable_inds` of Booleans that determine whether an index in Traces is legally sampleable
 (i.e., it is not the index of a last state of an episode);
 2. a vector `episodes_lengths` that contains the total duration of the episode that each step belong to;
@@ -32,7 +32,7 @@ end
 """
     PartialNamedTuple(::NamedTuple)
 
-Wraps a NamedTuple to signal an EpisodesBuffer that it is pushed into that it should 
+Wraps a NamedTuple to signal an EpisodesBuffer that it is pushed into that it should
 ignore the fact that this is a partial insertion. Used at the end of an episode to
 complete multiplex traces before moving to the next episode.
 """
@@ -118,8 +118,6 @@ pad!(vect::Vector{T}) where {T} = push!(vect, zero(T))
         end
     elseif traces_signature <: Tuple
         traces_signature = traces_signature.parameters
-        
-    
         for tr in traces_signature
             if !(tr <: MultiplexTraces)
                 #push a duplicate of last element as a dummy element, should never be sampled.
@@ -171,7 +169,7 @@ function Base.push!(eb::EpisodesBuffer, xs::NamedTuple)
     return nothing
 end
 
-function Base.push!(eb::EpisodesBuffer, xs::PartialNamedTuple) #wrap a NamedTuple to push without incrementing the step number. 
+function Base.push!(eb::EpisodesBuffer, xs::PartialNamedTuple) #wrap a NamedTuple to push without incrementing the step number.
     push!(eb.traces, xs.namedtuple)
     eb.sampleable_inds[end-1] = 1 #completes the episode trajectory.
 end
