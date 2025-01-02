@@ -34,15 +34,20 @@ end
     ) |> gpu
 
     @test t isa CircularArraySARTSATraces
+    @test ReinforcementLearningTrajectories.capacity(t) == 3
+    @test CircularArrayBuffers.capacity(t) == 3
 
-    push!(t, (state=ones(Float32, 2, 3),))
+    push!(t, (state=ones(Float32, 2, 3),) |> gpu)
     push!(t, (action=ones(Float32, 2), next_state=ones(Float32, 2, 3) * 2) |> gpu)
     @test length(t) == 0
 
     push!(t, (reward=1.0f0, terminal=false) |> gpu)
     @test length(t) == 0 # next_action is still missing
 
-    push!(t, (state=ones(Float32, 2, 3) * 3, action=ones(Float32, 2) * 2) |> gpu)
+    push!(t, (action=ones(Float32, 2) * 2,) |> gpu)
+    @test length(t) == 1
+
+    push!(t, (state=ones(Float32, 2, 3) * 3,) |> gpu)
     @test length(t) == 1
 
     # this will trigger the scalar indexing of CuArray
@@ -71,29 +76,33 @@ end
 
     @test length(t) == 3
 
+    push!(t, (action=ones(Float32, 2) * 6,) |> gpu)
+    @test length(t) == 3
+
     # this will trigger the scalar indexing of CuArray
     CUDA.@allowscalar @test t[1] == (
-        state=ones(Float32, 2, 3) * 2,
-        next_state=ones(Float32, 2, 3) * 3,
-        action=ones(Float32, 2) * 2,
-        next_action=ones(Float32, 2) * 3,
-        reward=2.0f0,
+        state=ones(Float32, 2, 3) * 3,
+        next_state=ones(Float32, 2, 3) * 4,
+        action=ones(Float32, 2) * 3,
+        next_action=ones(Float32, 2) * 4,
+        reward=3.0f0,
         terminal=false,
     )
     CUDA.@allowscalar @test t[end] == (
-        state=ones(Float32, 2, 3) * 4,
-        next_state=ones(Float32, 2, 3) * 5,
-        action=ones(Float32, 2) * 4,
-        next_action=ones(Float32, 2) * 5,
-        reward=4.0f0,
+        state=ones(Float32, 2, 3) * 5,
+        next_state=ones(Float32, 2, 3) * 6,
+        action=ones(Float32, 2) * 5,
+        next_action=ones(Float32, 2) * 6,
+        reward=5.0f0,
         terminal=false,
     )
 
     batch = t[1:3]
     @test size(batch.state) == (2, 3, 3)
     @test size(batch.action) == (2, 3)
-    @test batch.reward == [2.0, 3.0, 4.0] |> gpu
+    @test batch.reward == [3.0, 4.0, 5.0] |> gpu
     @test batch.terminal == Bool[0, 0, 0] |> gpu
+
 end
 
 @testset "ElasticArraySARTSTraces" begin
@@ -127,6 +136,8 @@ end
     )
 
     @test t isa CircularArraySLARTTraces
+    @test ReinforcementLearningTrajectories.capacity(t) == 3
+    @test CircularArrayBuffers.capacity(t) == 3
 end
 
 @testset "CircularPrioritizedTraces-SARTS" begin
@@ -136,6 +147,7 @@ end
         ),
         default_priority=1.0f0
     )
+    @test ReinforcementLearningTrajectories.capacity(t) == 3
 
     push!(t, (state=0, action=0))
 
@@ -196,6 +208,7 @@ end
         ),
         default_priority=1.0f0
     )
+    @test ReinforcementLearningTrajectories.capacity(t) == 3
 
     push!(t, (state=0, action=0))
 

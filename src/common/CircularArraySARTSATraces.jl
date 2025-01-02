@@ -24,12 +24,12 @@ function CircularArraySARTSATraces(;
     reward_eltype, reward_size = reward
     terminal_eltype, terminal_size = terminal
 
-    MultiplexTraces{SS′}(CircularArrayBuffer{state_eltype}(state_size..., capacity+2)) +
+    MultiplexTraces{SS′}(CircularArrayBuffer{state_eltype}(state_size..., capacity+1)) +
     MultiplexTraces{AA′}(CircularArrayBuffer{action_eltype}(action_size..., capacity+1)) +
     Traces(
-        reward=CircularArrayBuffer{reward_eltype}(reward_size..., capacity+1),
-        terminal=CircularArrayBuffer{terminal_eltype}(terminal_size..., capacity+1),
+        reward=CircularArrayBuffer{reward_eltype}(reward_size..., capacity),
+        terminal=CircularArrayBuffer{terminal_eltype}(terminal_size..., capacity),
     )
 end
 
-CircularArrayBuffers.capacity(t::CircularArraySARTSATraces) = CircularArrayBuffers.capacity(minimum(map(capacity,t.traces)))
+CircularArrayBuffers.capacity(t::CircularArraySARTSATraces) = minimum(map(capacity,t.traces))
