@@ -9,7 +9,10 @@ struct CircularPrioritizedTraces{T,names,Ts} <: AbstractTraces{names,Ts}
     default_priority::Float32
 end
 
-function CircularPrioritizedTraces(traces::AbstractTraces{names,Ts}; default_priority) where {names,Ts}
+function CircularPrioritizedTraces(
+    traces::AbstractTraces{names,Ts};
+    default_priority,
+) where {names,Ts}
     new_names = (:key, :priority, names...)
     new_Ts = Tuple{Int,Float32,Ts.parameters...}
     c = capacity(traces)
@@ -17,7 +20,7 @@ function CircularPrioritizedTraces(traces::AbstractTraces{names,Ts}; default_pri
         CircularVectorBuffer{Int}(c),
         SumTree(c),
         traces,
-        default_priority
+        default_priority,
     )
 end
 
@@ -60,6 +63,8 @@ function Base.getindex(ts::CircularPrioritizedTraces, s::Symbol)
     end
 end
 
-Base.getindex(t::CircularPrioritizedTraces{<:Any,names}, i) where {names} = NamedTuple{names}(map(k -> t[k][i], names))
+Base.getindex(t::CircularPrioritizedTraces{<:Any,names}, i) where {names} =
+    NamedTuple{names}(map(k -> t[k][i], names))
 
-capacity(t::CircularPrioritizedTraces) = ReinforcementLearningTrajectories.capacity(t.traces)
+capacity(t::CircularPrioritizedTraces) =
+    ReinforcementLearningTrajectories.capacity(t.traces)

@@ -1,4 +1,5 @@
-export InsertSampleRatioController, AsyncInsertSampleRatioController, EpisodeSampleRatioController
+export InsertSampleRatioController,
+    AsyncInsertSampleRatioController, EpisodeSampleRatioController
 
 """
     InsertSampleRatioController(;ratio=1., threshold=1)
@@ -43,10 +44,11 @@ end
 function AsyncInsertSampleRatioController(
     ratio,
     threshold,
-    ; ch_in_sz=1,
-    ch_out_sz=1,
-    n_inserted=0,
-    n_sampled=0
+    ;
+    ch_in_sz = 1,
+    ch_out_sz = 1,
+    n_inserted = 0,
+    n_sampled = 0,
 )
     AsyncInsertSampleRatioController(
         ratio,
@@ -54,7 +56,7 @@ function AsyncInsertSampleRatioController(
         n_inserted,
         n_sampled,
         Channel(ch_in_sz),
-        Channel(ch_out_sz)
+        Channel(ch_out_sz),
     )
 end
 
@@ -75,12 +77,12 @@ end
 
 function on_insert!(c::EpisodeSampleRatioController, n::Int, x::NamedTuple)
     if n > 0
-        c.n_episodes += sum(x.terminal) 
+        c.n_episodes += sum(x.terminal)
     end
 end
 
 function on_sample!(c::EpisodeSampleRatioController)
-    if c.n_episodes >= c.threshold && c.n_sampled <= (c.n_episodes - c.threshold) * c.ratio 
+    if c.n_episodes >= c.threshold && c.n_sampled <= (c.n_episodes - c.threshold) * c.ratio
         c.n_sampled += 1
         return true
     end

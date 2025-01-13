@@ -1,5 +1,12 @@
 using Random
-export EpisodesSampler, Episode, BatchSampler, NStepBatchSampler, MetaSampler, MultiBatchSampler, DummySampler, MultiStepSampler
+export EpisodesSampler,
+    Episode,
+    BatchSampler,
+    NStepBatchSampler,
+    MetaSampler,
+    MultiBatchSampler,
+    DummySampler,
+    MultiStepSampler
 
 struct SampleGenerator{S,T}
     sampler::S
@@ -40,21 +47,35 @@ end
 Uniformly sample **ONE** batch of `batchsize` examples for each trace specified
 in `names`. If `names` is not set, all the traces will be sampled.
 """
-BatchSampler(batchsize; kw...) = BatchSampler(; batchsize=batchsize, kw...)
+BatchSampler(batchsize; kw...) = BatchSampler(; batchsize = batchsize, kw...)
 BatchSampler(; kw...) = BatchSampler{nothing}(; kw...)
-BatchSampler{names}(batchsize; kw...) where {names} = BatchSampler{names}(; batchsize=batchsize, kw...)
-BatchSampler{names}(; batchsize, rng=Random.GLOBAL_RNG) where {names} = BatchSampler{names}(batchsize, rng)
+BatchSampler{names}(batchsize; kw...) where {names} =
+    BatchSampler{names}(; batchsize = batchsize, kw...)
+BatchSampler{names}(; batchsize, rng = Random.GLOBAL_RNG) where {names} =
+    BatchSampler{names}(batchsize, rng)
 
-StatsBase.sample(s::BatchSampler{nothing}, t::AbstractTraces) = StatsBase.sample(s, t, keys(t))
-StatsBase.sample(s::BatchSampler{names}, t::AbstractTraces) where {names} = StatsBase.sample(s, t, names)
+StatsBase.sample(s::BatchSampler{nothing}, t::AbstractTraces) =
+    StatsBase.sample(s, t, keys(t))
+StatsBase.sample(s::BatchSampler{names}, t::AbstractTraces) where {names} =
+    StatsBase.sample(s, t, names)
 
-function StatsBase.sample(s::BatchSampler, t::AbstractTraces, names, weights = StatsBase.UnitWeights{Int}(length(t)))
+function StatsBase.sample(
+    s::BatchSampler,
+    t::AbstractTraces,
+    names,
+    weights = StatsBase.UnitWeights{Int}(length(t)),
+)
     inds = StatsBase.sample(s.rng, 1:length(t), weights, s.batchsize)
     NamedTuple{names}(map(x -> collect(t[Val(x)][inds]), names))
 end
 
 function StatsBase.sample(s::BatchSampler, t::EpisodesBuffer, names)
-    StatsBase.sample(s, t.traces, names, StatsBase.FrequencyWeights(t.sampleable_inds[1:end-1]))
+    StatsBase.sample(
+        s,
+        t.traces,
+        names,
+        StatsBase.FrequencyWeights(t.sampleable_inds[1:end-1]),
+    )
 end
 
 # !!! avoid iterating an empty trajectory
@@ -68,20 +89,33 @@ end
 
 #####
 
-StatsBase.sample(s::BatchSampler{nothing}, t::CircularPrioritizedTraces) = StatsBase.sample(s, t, keys(t.traces))
+StatsBase.sample(s::BatchSampler{nothing}, t::CircularPrioritizedTraces) =
+    StatsBase.sample(s, t, keys(t.traces))
 
-function StatsBase.sample(s::BatchSampler, e::EpisodesBuffer{<:Any, <:Any, <:CircularPrioritizedTraces}, names)
+function StatsBase.sample(
+    s::BatchSampler,
+    e::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces},
+    names,
+)
     t = e.traces
     p = collect(deepcopy(t.priorities))
     w = StatsBase.FrequencyWeights(p)
     w .*= e.sampleable_inds[1:length(t)]
     inds = StatsBase.sample(s.rng, eachindex(w), w, s.batchsize)
-    NamedTuple{(:key, :priority, names...)}((t.keys[inds], p[inds], map(x -> collect(t.traces[Val(x)][inds]), names)...))
+    NamedTuple{(:key, :priority, names...)}((
+        t.keys[inds],
+        p[inds],
+        map(x -> collect(t.traces[Val(x)][inds]), names)...,
+    ))
 end
 
 function StatsBase.sample(s::BatchSampler, t::CircularPrioritizedTraces, names)
     inds, priorities = rand(s.rng, t.priorities, s.batchsize)
-    NamedTuple{(:key, :priority, names...)}((t.keys[inds], priorities, map(x -> collect(t.traces[Val(x)][inds]), names)...))
+    NamedTuple{(:key, :priority, names...)}((
+        t.keys[inds],
+        priorities,
+        map(x -> collect(t.traces[Val(x)][inds]), names)...,
+    ))
 end
 
 #####
@@ -148,7 +182,7 @@ struct MultiBatchSampler{S}
     n::Int
 end
 
-StatsBase.sample(m::MultiBatchSampler, t) = [StatsBase.sample(m.sampler, t) for _ in 1:m.n]
+StatsBase.sample(m::MultiBatchSampler, t) = [StatsBase.sample(m.sampler, t) for _ = 1:m.n]
 
 function Base.iterate(s::SampleGenerator{<:MultiBatchSampler})
     if length(s.traces) > 0
@@ -178,7 +212,7 @@ to an integer > 1. This samples the (stacksize - 1) previous states. This is use
 of partial observability, for example when the state is approximated by `stacksize` consecutive
 frames.
 """
-mutable struct NStepBatchSampler{names, S <: Union{Nothing,Int}, R <: AbstractRNG}
+mutable struct NStepBatchSampler{names,S<:Union{Nothing,Int},R<:AbstractRNG}
     n::Int # !!! n starts from 1
     γ::Float32
     batchsize::Int
@@ -187,10 +221,16 @@ mutable struct NStepBatchSampler{names, S <: Union{Nothing,Int}, R <: AbstractRN
 end
 
 NStepBatchSampler(t::AbstractTraces; kw...) = NStepBatchSampler{keys(t)}(; kw...)
-function NStepBatchSampler{names}(; n, γ, batchsize=32, stacksize=nothing, rng=Random.default_rng()) where {names}
+function NStepBatchSampler{names}(;
+    n,
+    γ,
+    batchsize = 32,
+    stacksize = nothing,
+    rng = Random.default_rng(),
+) where {names}
     @assert n >= 1 "n must be ≥ 1."
     ss = stacksize == 1 ? nothing : stacksize
-    NStepBatchSampler{names, typeof(ss), typeof(rng)}(n, γ, batchsize, ss, rng)
+    NStepBatchSampler{names,typeof(ss),typeof(rng)}(n, γ, batchsize, ss, rng)
 end
 
 #return a boolean vector of the valid sample indices given the stacksize and the truncated n for each index.
@@ -210,49 +250,92 @@ function StatsBase.sample(s::NStepBatchSampler{names}, ts) where {names}
     StatsBase.sample(s, ts, Val(names))
 end
 
-function StatsBase.sample(s::NStepBatchSampler, t::EpisodesBuffer, ::Val{names}) where names
+function StatsBase.sample(
+    s::NStepBatchSampler,
+    t::EpisodesBuffer,
+    ::Val{names},
+) where {names}
     weights, ns = valid_range(s, t)
-    inds = StatsBase.sample(s.rng, 1:length(t), StatsBase.FrequencyWeights(weights[1:end-1]), s.batchsize)
+    inds = StatsBase.sample(
+        s.rng,
+        1:length(t),
+        StatsBase.FrequencyWeights(weights[1:end-1]),
+        s.batchsize,
+    )
     fetch(s, t, Val(names), inds, ns)
 end
 
-function fetch(s::NStepBatchSampler, ts::EpisodesBuffer, ::Val{names}, inds, ns) where names
-    NamedTuple{names}(map(name -> collect(fetch(s, ts[name], Val(name), inds, ns[inds])), names))
+function fetch(
+    s::NStepBatchSampler,
+    ts::EpisodesBuffer,
+    ::Val{names},
+    inds,
+    ns,
+) where {names}
+    NamedTuple{names}(
+        map(name -> collect(fetch(s, ts[name], Val(name), inds, ns[inds])), names),
+    )
 end
 
 #state and next_state have specialized fetch methods due to stacksize
-fetch(::NStepBatchSampler{names, Nothing}, trace::AbstractTrace, ::Val{:state}, inds, ns) where {names} = trace[inds]
-fetch(s::NStepBatchSampler{names, Int}, trace::AbstractTrace, ::Val{:state}, inds, ns) where {names} = trace[[x + i for i in -s.stacksize+1:0, x in inds]]
-fetch(::NStepBatchSampler{names, Nothing}, trace::RelativeTrace{1,0}, ::Val{:next_state}, inds, ns) where {names} = trace[inds .+ ns .- 1]
-fetch(s::NStepBatchSampler{names, Int}, trace::RelativeTrace{1,0}, ::Val{:next_state}, inds, ns) where {names}  = trace[[x + ns[idx] - 1 + i for i in -s.stacksize+1:0, (idx,x) in enumerate(inds)]]
+fetch(
+    ::NStepBatchSampler{names,Nothing},
+    trace::AbstractTrace,
+    ::Val{:state},
+    inds,
+    ns,
+) where {names} = trace[inds]
+fetch(
+    s::NStepBatchSampler{names,Int},
+    trace::AbstractTrace,
+    ::Val{:state},
+    inds,
+    ns,
+) where {names} = trace[[x + i for i = -s.stacksize+1:0, x in inds]]
+fetch(
+    ::NStepBatchSampler{names,Nothing},
+    trace::RelativeTrace{1,0},
+    ::Val{:next_state},
+    inds,
+    ns,
+) where {names} = trace[inds.+ns.-1]
+fetch(
+    s::NStepBatchSampler{names,Int},
+    trace::RelativeTrace{1,0},
+    ::Val{:next_state},
+    inds,
+    ns,
+) where {names} =
+    trace[[x + ns[idx] - 1 + i for i = -s.stacksize+1:0, (idx, x) in enumerate(inds)]]
 
 #reward due to discounting
 function fetch(s::NStepBatchSampler, trace::AbstractTrace, ::Val{:reward}, inds, ns)
     rewards = Vector{eltype(trace)}(undef, length(inds))
-    for (i,idx) in enumerate(inds)
+    for (i, idx) in enumerate(inds)
         rewards_to_go = trace[idx:idx+ns[i]-1]
-        rewards[i] = foldr((x,y)->x + s.γ*y, rewards_to_go)
+        rewards[i] = foldr((x, y) -> x + s.γ * y, rewards_to_go)
     end
     return rewards
 end
 #terminal is that of the nth step
-fetch(::NStepBatchSampler, trace::AbstractTrace, ::Val{:terminal}, inds, ns) = trace[inds .+ ns .- 1]
+fetch(::NStepBatchSampler, trace::AbstractTrace, ::Val{:terminal}, inds, ns) =
+    trace[inds.+ns.-1]
 #right multiplex traces must be n-step sampled
-fetch(::NStepBatchSampler, trace::RelativeTrace{1,0} , ::Val, inds, ns) = trace[inds .+ ns .- 1]
+fetch(::NStepBatchSampler, trace::RelativeTrace{1,0}, ::Val, inds, ns) = trace[inds.+ns.-1]
 #normal trace types are fetched at inds
 fetch(::NStepBatchSampler, trace::AbstractTrace, ::Val, inds, ns) = trace[inds] #other types of trace are sampled normally
 
-function StatsBase.sample(s::NStepBatchSampler{names}, e::EpisodesBuffer{<:Any, <:Any, <:CircularPrioritizedTraces}) where {names}
+function StatsBase.sample(
+    s::NStepBatchSampler{names},
+    e::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces},
+) where {names}
     t = e.traces
     p = collect(deepcopy(t.priorities))
     w = StatsBase.FrequencyWeights(p)
-    valids, ns = valid_range(s,e)
+    valids, ns = valid_range(s, e)
     w .*= valids[1:length(t)]
     inds = StatsBase.sample(s.rng, eachindex(w), w, s.batchsize)
-    merge(
-        (key=t.keys[inds], priority=p[inds]),
-        fetch(s, e, Val(names), inds, ns)
-    )
+    merge((key = t.keys[inds], priority = p[inds]), fetch(s, e, Val(names), inds, ns))
 end
 
 """
@@ -262,21 +345,22 @@ A sampler that samples all Episodes present in the Trajectory and divides them i
 Episode containers. Truncated Episodes (e.g. due to the buffer capacity) are sampled as well.
 There will be at most one truncated episode and it will always be the first one.
 """
-struct EpisodesSampler{names}
-end
+struct EpisodesSampler{names} end
 
 EpisodesSampler() = EpisodesSampler{nothing}()
 #EpisodesSampler{names}() = new{names}()
 
 
-struct Episode{names, N <: NamedTuple{names}}
+struct Episode{names,N<:NamedTuple{names}}
     nt::N
 end
 
 @forward Episode.nt Base.keys, Base.haskey, Base.getindex
 
-StatsBase.sample(s::EpisodesSampler{nothing}, t::EpisodesBuffer) = StatsBase.sample(s,t,keys(t))
-StatsBase.sample(s::EpisodesSampler{names}, t::EpisodesBuffer) where names = StatsBase.sample(s,t,names)
+StatsBase.sample(s::EpisodesSampler{nothing}, t::EpisodesBuffer) =
+    StatsBase.sample(s, t, keys(t))
+StatsBase.sample(s::EpisodesSampler{names}, t::EpisodesBuffer) where {names} =
+    StatsBase.sample(s, t, names)
 
 function make_episode(t::EpisodesBuffer, range, names)
     nt = NamedTuple{names}(map(x -> collect(t[Val(x)][range]), names))
@@ -289,7 +373,7 @@ function StatsBase.sample(::EpisodesSampler, t::EpisodesBuffer, names)
     while idx < length(t)
         if t.sampleable_inds[idx] == 1
             last_state_idx = idx + t.episodes_lengths[idx] - t.step_numbers[idx]
-            push!(ranges,idx:last_state_idx)
+            push!(ranges, idx:last_state_idx)
             idx = last_state_idx + 1
         else
             idx += 1
@@ -309,7 +393,7 @@ Sampler that fetches steps `[x, x+1, ..., x + n -1]` for each trace of each samp
 truncated by the end of its episode. This means that the dimensions of each sample are not
 the same.
 """
-struct MultiStepSampler{names, S <: Union{Nothing,Int}, R <: AbstractRNG}
+struct MultiStepSampler{names,S<:Union{Nothing,Int},R<:AbstractRNG}
     n::Int
     batchsize::Int
     stacksize::S
@@ -317,10 +401,15 @@ struct MultiStepSampler{names, S <: Union{Nothing,Int}, R <: AbstractRNG}
 end
 
 MultiStepSampler(t::AbstractTraces; kw...) = MultiStepSampler{keys(t)}(; kw...)
-function MultiStepSampler{names}(; n::Int, batchsize, stacksize=nothing, rng=Random.default_rng()) where {names}
+function MultiStepSampler{names}(;
+    n::Int,
+    batchsize,
+    stacksize = nothing,
+    rng = Random.default_rng(),
+) where {names}
     @assert n >= 1 "n must be ≥ 1."
     ss = stacksize == 1 ? nothing : stacksize
-    MultiStepSampler{names, typeof(ss), typeof(rng)}(n, batchsize, ss, rng)
+    MultiStepSampler{names,typeof(ss),typeof(rng)}(n, batchsize, ss, rng)
 end
 
 function valid_range(s::MultiStepSampler, eb::EpisodesBuffer)
@@ -339,33 +428,59 @@ function StatsBase.sample(s::MultiStepSampler{names}, ts) where {names}
     StatsBase.sample(s, ts, Val(names))
 end
 
-function StatsBase.sample(s::MultiStepSampler, t::EpisodesBuffer, ::Val{names}) where names
+function StatsBase.sample(
+    s::MultiStepSampler,
+    t::EpisodesBuffer,
+    ::Val{names},
+) where {names}
     weights, ns = valid_range(s, t)
-    inds = StatsBase.sample(s.rng, 1:length(t), StatsBase.FrequencyWeights(weights[1:end-1]), s.batchsize)
+    inds = StatsBase.sample(
+        s.rng,
+        1:length(t),
+        StatsBase.FrequencyWeights(weights[1:end-1]),
+        s.batchsize,
+    )
     fetch(s, t, Val(names), inds, ns)
 end
 
-function fetch(s::MultiStepSampler, ts::EpisodesBuffer, ::Val{names}, inds, ns) where names
-    NamedTuple{names}(map(name -> collect(fetch(s, ts[name], Val(name), inds, ns[inds])), names))
+function fetch(
+    s::MultiStepSampler,
+    ts::EpisodesBuffer,
+    ::Val{names},
+    inds,
+    ns,
+) where {names}
+    NamedTuple{names}(
+        map(name -> collect(fetch(s, ts[name], Val(name), inds, ns[inds])), names),
+    )
 end
 
 function fetch(::MultiStepSampler, trace, ::Val, inds, ns)
-    [trace[idx:(idx + ns[i] - 1)] for (i,idx) in enumerate(inds)]
+    [trace[idx:(idx+ns[i]-1)] for (i, idx) in enumerate(inds)]
 end
 
-function fetch(s::MultiStepSampler{names, Int}, trace::AbstractTrace, ::Union{Val{:state}, Val{:next_state}}, inds, ns) where {names}
-    [trace[[idx + i + n - 1 for i in -s.stacksize+1:0, n in 1:ns[j]]] for (j,idx) in enumerate(inds)]
+function fetch(
+    s::MultiStepSampler{names,Int},
+    trace::AbstractTrace,
+    ::Union{Val{:state},Val{:next_state}},
+    inds,
+    ns,
+) where {names}
+    [
+        trace[[idx + i + n - 1 for i = -s.stacksize+1:0, n = 1:ns[j]]] for
+        (j, idx) in enumerate(inds)
+    ]
 end
 
-function StatsBase.sample(s::MultiStepSampler{names}, e::EpisodesBuffer{<:Any, <:Any, <:CircularPrioritizedTraces}) where {names}
+function StatsBase.sample(
+    s::MultiStepSampler{names},
+    e::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces},
+) where {names}
     t = e.traces
     p = collect(deepcopy(t.priorities))
     w = StatsBase.FrequencyWeights(p)
-    valids, ns = valid_range(s,e)
+    valids, ns = valid_range(s, e)
     w .*= valids[1:length(t)]
     inds = StatsBase.sample(s.rng, eachindex(w), w, s.batchsize)
-    merge(
-        (key=t.keys[inds], priority=p[inds]),
-        fetch(s, e, Val(names), inds, ns)
-    )
+    merge((key = t.keys[inds], priority = p[inds]), fetch(s, e, Val(names), inds, ns))
 end

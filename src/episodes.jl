@@ -22,7 +22,8 @@ If `traces` is a capacitated buffer, such as a CircularArraySARTSTraces, then th
 EpisodesBuffer assumes that individual transitions are `push!`ed. Appending is not yet supported.
 """
 
-mutable struct EpisodesBuffer{names, E, T<:AbstractTraces{names, E},B,S} <: AbstractTraces{names,E}
+mutable struct EpisodesBuffer{names,E,T<:AbstractTraces{names,E},B,S} <:
+               AbstractTraces{names,E}
     traces::T
     sampleable_inds::S
     step_numbers::B
@@ -42,25 +43,26 @@ end
 
 # Capacity of an EpisodesBuffer is the capacity of the underlying traces + 1 for certain cases
 function is_capacity_plus_one(traces::AbstractTraces)
-    if any(t->t isa MultiplexTraces, traces.traces)
+    if any(t -> t isa MultiplexTraces, traces.traces)
         # MultiplexTraces buffer next_state or next_action, so we need to add one to the capacity
         return true
     else
         false
     end
 end
-is_capacity_plus_one(traces::CircularPrioritizedTraces) = is_capacity_plus_one(traces.traces)
+is_capacity_plus_one(traces::CircularPrioritizedTraces) =
+    is_capacity_plus_one(traces.traces)
 
 function EpisodesBuffer(traces::AbstractTraces)
     cap = is_capacity_plus_one(traces) ? capacity(traces) + 1 : capacity(traces)
     @assert isempty(traces) "EpisodesBuffer must be initialized with empty traces."
     if !isinf(cap)
-        legalinds =  CircularBuffer{Bool}(cap)
+        legalinds = CircularBuffer{Bool}(cap)
         step_numbers = CircularBuffer{Int}(cap)
         eplengths = deepcopy(step_numbers)
         EpisodesBuffer(traces, legalinds, step_numbers, eplengths)
     else
-        legalinds =  BitVector()
+        legalinds = BitVector()
         step_numbers = Vector{Int}()
         eplengths = deepcopy(step_numbers)
         EpisodesBuffer(traces, legalinds, step_numbers, eplengths)
@@ -68,7 +70,8 @@ function EpisodesBuffer(traces::AbstractTraces)
 end
 
 function Base.getindex(es::EpisodesBuffer, idx::Int...)
-    @boundscheck all(es.sampleable_inds[idx...]) || throw(BoundsError(es.sampleable_inds, idx))
+    @boundscheck all(es.sampleable_inds[idx...]) ||
+                 throw(BoundsError(es.sampleable_inds, idx))
     getindex(es.traces, idx...)
 end
 
@@ -81,7 +84,8 @@ capacity(eb::EpisodesBuffer) = capacity(eb.traces)
 Base.size(eb::EpisodesBuffer) = size(eb.traces)
 Base.length(eb::EpisodesBuffer) = length(eb.traces)
 Base.keys(eb::EpisodesBuffer) = keys(eb.traces)
-Base.keys(eb::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces}) = keys(eb.traces.traces)
+Base.keys(eb::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces}) =
+    keys(eb.traces.traces)
 function Base.show(io::IO, m::MIME"text/plain", eb::EpisodesBuffer{names}) where {names}
     s = nameof(typeof(eb))
     t = eb.traces
@@ -91,15 +95,16 @@ end
 
 ispartial_insert(traces::Traces, xs) = length(xs) < length(traces.traces) #this is the number of traces it contains not the number of steps.
 ispartial_insert(eb::EpisodesBuffer, xs) = ispartial_insert(eb.traces, xs)
-ispartial_insert(traces::CircularPrioritizedTraces, xs) = ispartial_insert(traces.traces, xs)
+ispartial_insert(traces::CircularPrioritizedTraces, xs) =
+    ispartial_insert(traces.traces, xs)
 
 function pad!(trace::Trace)
     pad!(trace.parent)
     return nothing
 end
 
-pad!(vect::ElasticArray{T, Vector{T}}) where {T} = push!(vect, zero(T))
-pad!(vect::ElasticVector{T, Vector{T}}) where {T} = push!(vect, zero(T))
+pad!(vect::ElasticArray{T,Vector{T}}) where {T} = push!(vect, zero(T))
+pad!(vect::ElasticVector{T,Vector{T}}) where {T} = push!(vect, zero(T))
 pad!(buf::CircularArrayBuffer{T,N,A}) where {T,N,A} = push!(buf, zero(T))
 pad!(vect::Vector{T}) where {T} = push!(vect, zero(T))
 
@@ -133,7 +138,8 @@ end
 
 fill_multiplex(eb::EpisodesBuffer) = fill_multiplex(eb.traces)
 
-fill_multiplex(eb::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces}) = fill_multiplex(eb.traces.traces)
+fill_multiplex(eb::EpisodesBuffer{<:Any,<:Any,<:CircularPrioritizedTraces}) =
+    fill_multiplex(eb.traces.traces)
 
 max_length(eb::EpisodesBuffer) = max_length(eb.traces)
 
@@ -145,7 +151,7 @@ function Base.push!(eb::EpisodesBuffer, xs::NamedTuple)
         push!(eb.episodes_lengths, 0)
         push!(eb.sampleable_inds, 0)
     elseif !partial #typical inserting
-        if haskey(eb,:next_action) # if trace has next_action
+        if haskey(eb, :next_action) # if trace has next_action
             if eb.step_numbers[end] > 1            # and if there are sufficient steps in the current episode
                 eb.sampleable_inds[end-1] = 1      # steps are indexable one step later
             end
@@ -155,7 +161,7 @@ function Base.push!(eb::EpisodesBuffer, xs::NamedTuple)
         push!(eb.sampleable_inds, 0) #this one is no longer
         ep_length = last(eb.step_numbers)
         push!(eb.episodes_lengths, ep_length)
-        startidx = max(1,length(eb.step_numbers) - last(eb.step_numbers))
+        startidx = max(1, length(eb.step_numbers) - last(eb.step_numbers))
         eb.episodes_lengths[startidx:end] .= ep_length
         push!(eb.step_numbers, ep_length + 1)
     elseif partial
