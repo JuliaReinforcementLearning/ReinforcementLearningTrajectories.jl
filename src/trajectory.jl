@@ -26,7 +26,12 @@ Base.@kwdef struct Trajectory{C,S,T,F}
     controller::T = InsertSampleRatioController()
     transformer::F = identity
 
-    function Trajectory(c::C, s::S, t::T=InsertSampleRatioController(), f=identity) where {C,S,T}
+    function Trajectory(
+        c::C,
+        s::S,
+        t::T = InsertSampleRatioController(),
+        f = identity,
+    ) where {C,S,T}
         if c isa EpisodesBuffer
             new{C,S,T,typeof(f)}(c, s, t, f)
         else
@@ -35,7 +40,12 @@ Base.@kwdef struct Trajectory{C,S,T,F}
         end
     end
 
-    function Trajectory(container::C, sampler::S, controller::T, transformer) where {C,S,T<:AsyncInsertSampleRatioController}
+    function Trajectory(
+        container::C,
+        sampler::S,
+        controller::T,
+        transformer,
+    ) where {C,S,T<:AsyncInsertSampleRatioController}
         t = Threads.@spawn while true
             for msg in controller.ch_in
                 if msg.f === Base.push!
@@ -51,7 +61,8 @@ Base.@kwdef struct Trajectory{C,S,T,F}
                 end
 
                 if controller.n_inserted >= controller.threshold
-                    if controller.n_sampled <= (controller.n_inserted - controller.threshold) * controller.ratio
+                    if controller.n_sampled <=
+                       (controller.n_inserted - controller.threshold) * controller.ratio
                         batch = StatsBase.sample(sampler, container)
                         put!(controller.ch_out, batch)
                         controller.n_sampled += 1
@@ -62,13 +73,14 @@ Base.@kwdef struct Trajectory{C,S,T,F}
 
         bind(controller.ch_in, t)
         bind(controller.ch_out, t)
-        
+
         new{C,S,T,typeof(transformer)}(container, sampler, controller, transformer)
     end
 end
 
 TrajectoryStyle(::Trajectory) = SyncTrajectoryStyle()
-TrajectoryStyle(::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}) = AsyncTrajectoryStyle()
+TrajectoryStyle(::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}) =
+    AsyncTrajectoryStyle()
 
 Base.bind(::Trajectory, ::Task) = nothing
 
@@ -89,9 +101,12 @@ struct CallMsg
     kw::Any
 end
 
-Base.push!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, x) = put!(t.controller.ch_in, CallMsg(Base.push!, (x,), NamedTuple()))
-Base.append!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, x) = put!(t.controller.ch_in, CallMsg(Base.append!, (x,), NamedTuple()))
-Base.setindex!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, v, I...) = put!(t.controller.ch_in, CallMsg(Base.setindex!, (v, I...), NamedTuple()))
+Base.push!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, x) =
+    put!(t.controller.ch_in, CallMsg(Base.push!, (x,), NamedTuple()))
+Base.append!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, x) =
+    put!(t.controller.ch_in, CallMsg(Base.append!, (x,), NamedTuple()))
+Base.setindex!(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, v, I...) =
+    put!(t.controller.ch_in, CallMsg(Base.setindex!, (v, I...), NamedTuple()))
 
 function Base.append!(t::Trajectory, x)
     append!(t.container, x)
@@ -126,7 +141,8 @@ StatsBase.sample(t::Trajectory) = StatsBase.sample(t.sampler, t.container)
 Keep sampling batches from the trajectory until the trajectory is not ready to
 be sampled yet due to the `controller`.
 """
-iter(t::Trajectory) = Iterators.takewhile(_ -> on_sample!(t), Iterators.cycle(SampleGenerator(t)))
+iter(t::Trajectory) =
+    Iterators.takewhile(_ -> on_sample!(t), Iterators.cycle(SampleGenerator(t)))
 
 #The use of iterate(::SampleGenerator) has been suspended in v0.1.8 due to a significant drop in performance. 
 function Base.iterate(t::Trajectory, args...)
@@ -135,11 +151,13 @@ function Base.iterate(t::Trajectory, args...)
     else
         nothing
     end
-end 
+end
 Base.IteratorSize(t::Trajectory) = Base.IteratorSize(iter(t))
 
-Base.iterate(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, args...) = iterate(t.controller.ch_out, args...)
-Base.IteratorSize(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}) = Base.IteratorSize(t.controller.ch_out)
+Base.iterate(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}, args...) =
+    iterate(t.controller.ch_out, args...)
+Base.IteratorSize(t::Trajectory{<:Any,<:Any,<:AsyncInsertSampleRatioController}) =
+    Base.IteratorSize(t.controller.ch_out)
 
 Base.keys(t::Trajectory) = keys(t.container)
 Base.haskey(t::Trajectory, k) = k in keys(t)

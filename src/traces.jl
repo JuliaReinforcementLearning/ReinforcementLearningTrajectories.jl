@@ -12,7 +12,8 @@ abstract type AbstractTrace{E} <: AbstractVector{E} end
 
 Base.convert(::Type{AbstractTrace}, x::AbstractTrace) = x
 
-Base.summary(io::IO, t::AbstractTrace) = print(io, "$(length(t))-element $(nameof(typeof(t)))")
+Base.summary(io::IO, t::AbstractTrace) =
+    print(io, "$(length(t))-element $(nameof(typeof(t)))")
 
 #####
 
@@ -31,7 +32,8 @@ struct Trace{T,E} <: AbstractTrace{E}
     parent::T
 end
 
-Base.summary(io::IO, t::Trace{T}) where {T} = print(io, "$(length(t))-element$(length(t) > 0 ? 's' : "") $(nameof(typeof(t))){$T}")
+Base.summary(io::IO, t::Trace{T}) where {T} =
+    print(io, "$(length(t))-element$(length(t) > 0 ? 's' : "") $(nameof(typeof(t))){$T}")
 
 function Trace(x::T) where {T<:AbstractArray}
     E = eltype(x)
@@ -46,10 +48,25 @@ Adapt.adapt_structure(to, t::Trace) = Trace(Adapt.adapt_structure(to, t.parent))
 Base.convert(::Type{AbstractTrace}, x::AbstractArray) = Trace(x)
 
 Base.size(x::Trace) = (size(x.parent, ndims(x.parent)),)
-Base.getindex(s::Trace, I) = Base.maybeview(s.parent, ntuple(i -> i == ndims(s.parent) ? I : (:), Val(ndims(s.parent)))...)
-Base.setindex!(s::Trace, v, I) = setindex!(s.parent, v, ntuple(i -> i == ndims(s.parent) ? I : (:), Val(ndims(s.parent)))...)
+Base.getindex(s::Trace, I) = Base.maybeview(
+    s.parent,
+    ntuple(i -> i == ndims(s.parent) ? I : (:), Val(ndims(s.parent)))...,
+)
+Base.setindex!(s::Trace, v, I) = setindex!(
+    s.parent,
+    v,
+    ntuple(i -> i == ndims(s.parent) ? I : (:), Val(ndims(s.parent)))...,
+)
 
-@forward Trace.parent Base.parent, Base.pushfirst!, Base.push!, Base.append!, Base.prepend!, Base.pop!, Base.popfirst!, Base.empty!, Base.eltype
+@forward Trace.parent Base.parent,
+Base.pushfirst!,
+Base.push!,
+Base.append!,
+Base.prepend!,
+Base.pop!,
+Base.popfirst!,
+Base.empty!,
+Base.eltype
 
 #By default, AbstractTrace have infinity capacity (like a Vector). This method is specialized for 
 #CircularArraySARTSTraces in common.jl. The functions below are made that way to avoid type piracy.
@@ -88,7 +105,8 @@ Dedicated for `MultiplexTraces` to avoid scalar indexing when `view(view(t::Mult
 struct RelativeTrace{left,right,T,E} <: AbstractTrace{E}
     trace::Trace{T,E}
 end
-RelativeTrace{left,right}(t::Trace{T,E}) where {left,right,T,E} = RelativeTrace{left,right,T,E}(t)
+RelativeTrace{left,right}(t::Trace{T,E}) where {left,right,T,E} =
+    RelativeTrace{left,right,T,E}(t)
 
 Base.size(x::RelativeTrace{0,-1}) = (max(0, length(x.trace) - 1),)
 Base.size(x::RelativeTrace{1,0}) = (max(0, length(x.trace) - 1),)
@@ -123,13 +141,18 @@ end
 
 function MultiplexTraces{names}(t) where {names}
     if length(names) != 2
-        throw(ArgumentError("MultiplexTraces has exactly two sub traces, got $(length(names)) trace names"))
+        throw(
+            ArgumentError(
+                "MultiplexTraces has exactly two sub traces, got $(length(names)) trace names",
+            ),
+        )
     end
     trace = convert(AbstractTrace, t)
     MultiplexTraces{names,typeof(trace),eltype(trace)}(trace)
 end
 
-Adapt.adapt_structure(to, t::MultiplexTraces{names}) where {names} = MultiplexTraces{names}(Adapt.adapt_structure(to, t.trace))
+Adapt.adapt_structure(to, t::MultiplexTraces{names}) where {names} =
+    MultiplexTraces{names}(Adapt.adapt_structure(to, t.trace))
 
 Base.getindex(t::MultiplexTraces{names}, k::Symbol) where {names} = _getindex(t, Val(k))
 
@@ -145,8 +168,10 @@ Base.getindex(t::MultiplexTraces{names}, k::Symbol) where {names} = _getindex(t,
     return :($ex)
 end
 
-Base.getindex(t::MultiplexTraces{names}, I::Int) where {names} = NamedTuple{names}((t.trace[I], t.trace[I+1]))
-Base.getindex(t::MultiplexTraces{names}, I::AbstractArray{Int}) where {names} = NamedTuple{names}((t.trace[I], t.trace[I.+1]))
+Base.getindex(t::MultiplexTraces{names}, I::Int) where {names} =
+    NamedTuple{names}((t.trace[I], t.trace[I+1]))
+Base.getindex(t::MultiplexTraces{names}, I::AbstractArray{Int}) where {names} =
+    NamedTuple{names}((t.trace[I], t.trace[I.+1]))
 
 Base.size(t::MultiplexTraces) = (max(0, length(t.trace) - 1),)
 capacity(t::MultiplexTraces) = capacity(t.trace)
@@ -154,13 +179,19 @@ capacity(t::MultiplexTraces) = capacity(t.trace)
 @forward MultiplexTraces.trace Base.parent, Base.pop!, Base.popfirst!, Base.empty!
 
 for f in (:push!, :pushfirst!, :append!, :prepend!)
-    @eval function Base.$f(t::MultiplexTraces{names}, x::NamedTuple{ks,Tuple{Ts}}) where {names,ks,Ts}
+    @eval function Base.$f(
+        t::MultiplexTraces{names},
+        x::NamedTuple{ks,Tuple{Ts}},
+    ) where {names,ks,Ts}
         k, v = first(ks), first(x)
         if k in names
             $f(t.trace, v)
         end
     end
-    @eval function Base.$f(t::MultiplexTraces{names}, x::RelativeTrace{left, right}) where {names, left, right}
+    @eval function Base.$f(
+        t::MultiplexTraces{names},
+        x::RelativeTrace{left,right},
+    ) where {names,left,right}
         if left == 0 #do not accept appending the second name as it would be appended twice
             $f(t[first(names)].trace, x.trace)
         end
@@ -201,7 +232,7 @@ end
     index_ = build_trace_index(names, Trs)
     # Generate code, i.e. find the correct index for a given key
     ex = :()
-    
+
     for name in names
         if QuoteNode(name) == QuoteNode(k)
             index_element = index_[k]
@@ -240,7 +271,10 @@ function Base.:(+)(t1::Traces{k1,T,N,T1}, t2::AbstractTraces{k2,T2}) where {k1,T
     Traces{ks,typeof(ts),length(ks),Tuple{T1.types...,T2.types...}}(ts)
 end
 
-function Base.:(+)(t1::Traces{k1,T1,N1,E1}, t2::Traces{k2,T2,N2,E2}) where {k1,T1,N1,E1,k2,T2,N2,E2}
+function Base.:(+)(
+    t1::Traces{k1,T1,N1,E1},
+    t2::Traces{k2,T2,N2,E2},
+) where {k1,T1,N1,E1,k2,T2,N2,E2}
     ks = (k1..., k2...)
     ts = (t1.traces..., t2.traces...)
     Traces{ks,typeof(ts),length(ks),Tuple{E1.types...,E2.types...}}(ts)
@@ -250,7 +284,7 @@ Base.size(t::Traces) = (mapreduce(length, min, t.traces),)
 max_length(t::Traces) = mapreduce(length, max, t.traces)
 
 function capacity(t::Traces{names,Trs,N,E}) where {names,Trs,N,E}
-    minimum(map(idx->capacity(t[idx]), names))
+    minimum(map(idx -> capacity(t[idx]), names))
 end
 
 @generated function Base.push!(ts::Traces, xs::NamedTuple{N,T}) where {N,T}
@@ -269,11 +303,15 @@ end
     return :($ex)
 end
 
-@generated function Base.pushfirst!(ts::Traces{names,Trs,N,E}, ::Val{k}, v) where {names,Trs,N,E,k}
+@generated function Base.pushfirst!(
+    ts::Traces{names,Trs,N,E},
+    ::Val{k},
+    v,
+) where {names,Trs,N,E,k}
     index_ = build_trace_index(names, Trs)
     # Generate code, i.e. find the correct index for a given key
     ex = :()
-    
+
     for name in names
         if QuoteNode(name) == QuoteNode(k)
             index_element = index_[k]
@@ -285,11 +323,15 @@ end
     return :($ex)
 end
 
-@generated function Base.push!(ts::Traces{names,Trs,N,E}, ::Val{k}, v) where {names,Trs,N,E,k}
+@generated function Base.push!(
+    ts::Traces{names,Trs,N,E},
+    ::Val{k},
+    v,
+) where {names,Trs,N,E,k}
     index_ = build_trace_index(names, Trs)
     # Generate code, i.e. find the correct index for a given key
     ex = :()
-    
+
     for name in names
         if QuoteNode(name) == QuoteNode(k)
             index_element = index_[k]

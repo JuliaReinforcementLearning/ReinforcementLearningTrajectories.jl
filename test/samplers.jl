@@ -3,10 +3,7 @@ import ReinforcementLearningTrajectories.fetch
     @testset "BatchSampler" begin
         sz = 32
         s = BatchSampler(sz)
-        t = Traces(
-            state=rand(3, 4, 5),
-            action=rand(1:4, 5),
-        )
+        t = Traces(state = rand(3, 4, 5), action = rand(1:4, 5))
 
         b = sample(s, t)
 
@@ -15,15 +12,15 @@ import ReinforcementLearningTrajectories.fetch
         @test size(b.action) == (sz,)
 
         #In EpisodesBuffer
-        eb = EpisodesBuffer(CircularArraySARTSATraces(capacity=10))
+        eb = EpisodesBuffer(CircularArraySARTSATraces(capacity = 10))
         push!(eb, (state = 1,))
         for i = 1:5
-            push!(eb, (state = i+1, action = i, reward = i, terminal = false))
+            push!(eb, (state = i + 1, action = i, reward = i, terminal = false))
         end
         push!(eb, PartialNamedTuple((next_action = 6,)))
         push!(eb, (state = 7,))
-        for (j,i) = enumerate(8:11)
-            push!(eb, (state = i, action = i-1, reward = i-1, terminal = false))
+        for (j, i) in enumerate(8:11)
+            push!(eb, (state = i, action = i - 1, reward = i - 1, terminal = false))
         end
         push!(eb, PartialNamedTuple((next_action = 11,)))
 
@@ -32,20 +29,17 @@ import ReinforcementLearningTrajectories.fetch
         cm = counter(b[:state])
         @test !haskey(cm, 6)
         @test !haskey(cm, 11)
-        @test all(in(keys(cm)), [1:5;7:10])
+        @test all(in(keys(cm)), [1:5; 7:10])
     end
 
     @testset "MetaSampler" begin
         t = Trajectory(
-            container=Traces(
-                a=Int[],
-                b=Bool[]
-            ),
-            sampler=MetaSampler(policy=BatchSampler(3), critic=BatchSampler(5)),
+            container = Traces(a = Int[], b = Bool[]),
+            sampler = MetaSampler(policy = BatchSampler(3), critic = BatchSampler(5)),
         )
         push!(t, (a = 1,))
-        for i in 1:10
-            push!(t, (a=i, b=true))
+        for i = 1:10
+            push!(t, (a = i, b = true))
         end
 
         batches = collect(t)
@@ -56,16 +50,16 @@ import ReinforcementLearningTrajectories.fetch
 
     @testset "MultiBatchSampler" begin
         t = Trajectory(
-            container=Traces(
-                a=Int[],
-                b=Bool[]
+            container = Traces(a = Int[], b = Bool[]),
+            sampler = MetaSampler(
+                policy = BatchSampler(3),
+                critic = MultiBatchSampler(BatchSampler(5), 2),
             ),
-            sampler=MetaSampler(policy=BatchSampler(3), critic=MultiBatchSampler(BatchSampler(5), 2)),
         )
 
         push!(t, (a = 1,))
-        for i in 1:10
-            push!(t, (a=i, b=true))
+        for i = 1:10
+            push!(t, (a = i, b = true))
         end
 
         batches = collect(t)

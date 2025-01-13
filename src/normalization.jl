@@ -1,4 +1,5 @@
-import OnlineStats: OnlineStats, Group, Moments, fit!, OnlineStat, Weight, EqualWeight, mean, std
+import OnlineStats:
+    OnlineStats, Group, Moments, fit!, OnlineStat, Weight, EqualWeight, mean, std
 export scalar_normalizer, array_normalizer, NormalizedTraces, Normalizer
 import MacroTools.@forward
 
@@ -11,11 +12,15 @@ struct Normalizer{OS<:OnlineStat}
     os::OS
 end
 
-@forward Normalizer.os OnlineStats.mean, OnlineStats.std, Base.iterate, normalize, Base.length
+@forward Normalizer.os OnlineStats.mean,
+OnlineStats.std,
+Base.iterate,
+normalize,
+Base.length
 
 #Treats last dim as batch dim
 function OnlineStats.fit!(n::Normalizer, data::AbstractArray)
-    for d in eachslice(data, dims=ndims(data))
+    for d in eachslice(data, dims = ndims(data))
         fit!(n.os, vec(d))
     end
     n
@@ -74,13 +79,17 @@ end
 
 function normalize(os::Group{<:AbstractVector{<:Moments}}, x::AbstractArray)
     xn = similar(x)
-    for (i, slice) in enumerate(eachslice(x, dims=ndims(x)))
-        xn[repeat([:], ndims(x) - 1)..., i] .= reshape(normalize(os, vec(slice)), size(x)[1:end-1]...)
+    for (i, slice) in enumerate(eachslice(x, dims = ndims(x)))
+        xn[repeat([:], ndims(x) - 1)..., i] .=
+            reshape(normalize(os, vec(slice)), size(x)[1:end-1]...)
     end
     return xn
 end
 
-function normalize(os::Group{<:AbstractVector{<:Moments}}, x::AbstractVector{<:AbstractArray})
+function normalize(
+    os::Group{<:AbstractVector{<:Moments}},
+    x::AbstractVector{<:AbstractArray},
+)
     xn = similar(x)
     for (i, el) in enumerate(x)
         xn[i] = normalize(os, vec(el))
@@ -96,7 +105,7 @@ have equal weights in the computation of the moments.
 See the [OnlineStats documentation](https://joshday.github.io/OnlineStats.jl/stable/weights/) 
 to use variants such as exponential weights to favor the most recent observations.
 """
-scalar_normalizer(; weight::Weight=EqualWeight()) = Normalizer(Moments(weight=weight))
+scalar_normalizer(; weight::Weight = EqualWeight()) = Normalizer(Moments(weight = weight))
 
 """
     array_normalizer(size::Tuple{Int}; weights = OnlineStats.EqualWeight())
@@ -108,7 +117,8 @@ By default, all samples have equal weights in the computation of the moments.
 See the [OnlineStats documentation](https://joshday.github.io/OnlineStats.jl/stable/weights/) 
 to use variants such as exponential weights to favor the most recent observations.
 """
-array_normalizer(size::NTuple{N,Int}; weight::Weight=EqualWeight()) where {N} = Normalizer(Group([Moments(weight=weight) for _ in 1:prod(size)]))
+array_normalizer(size::NTuple{N,Int}; weight::Weight = EqualWeight()) where {N} =
+    Normalizer(Group([Moments(weight = weight) for _ = 1:prod(size)]))
 
 """
     NormalizedTraces(traces::AbstractTraces, normalizers::NamedTuple)
@@ -142,12 +152,16 @@ traj = Trajectory(
 )
 ```
 """
-struct NormalizedTraces{names,TT,T<:AbstractTraces{names,TT},normnames,N} <: AbstractTraces{names,TT}
+struct NormalizedTraces{names,TT,T<:AbstractTraces{names,TT},normnames,N} <:
+       AbstractTraces{names,TT}
     traces::T
     normalizers::NamedTuple{normnames,N}
 end
 
-function NormalizedTraces(traces::AbstractTraces{names,TT}; trace_normalizer_pairs...) where {names} where {TT}
+function NormalizedTraces(
+    traces::AbstractTraces{names,TT};
+    trace_normalizer_pairs...,
+) where {names} where {TT}
     for key in keys(trace_normalizer_pairs)
         @assert key in keys(traces) "Traces do not have key $key, valid keys are $(keys(traces))."
     end
@@ -155,7 +169,8 @@ function NormalizedTraces(traces::AbstractTraces{names,TT}; trace_normalizer_pai
     for trace in traces.traces
         #check if all traces of MultiplexTraces are in pairs
         if trace isa MultiplexTraces
-            if length(intersect(keys(trace), keys(trace_normalizer_pairs))) in [0, length(keys(trace))] #check if none or all keys are in normalizers
+            if length(intersect(keys(trace), keys(trace_normalizer_pairs))) in
+               [0, length(keys(trace))] #check if none or all keys are in normalizers
                 continue
             else #if not then one is missing
                 present_key = only(intersect(keys(trace), keys(trace_normalizer_pairs)))
@@ -180,10 +195,18 @@ function Base.show(io::IO, ::MIME"text/plain", t::NormalizedTraces{names,T}) whe
     end
 end
 
-@forward NormalizedTraces.traces Base.length, Base.size, Base.lastindex, Base.firstindex, Base.view, Base.pop!, Base.popfirst!, Base.empty!, Base.parent
+@forward NormalizedTraces.traces Base.length,
+Base.size,
+Base.lastindex,
+Base.firstindex,
+Base.view,
+Base.pop!,
+Base.popfirst!,
+Base.empty!,
+Base.parent
 
 for f in (:push!, :pushfirst!, :append!, :prepend!)
-    @eval function Base.$f(nt::NormalizedTraces, x::T) where T
+    @eval function Base.$f(nt::NormalizedTraces, x::T) where {T}
         for key in intersect(keys(nt.normalizers), fieldnames(T))
             fit!(nt.normalizers[key], getfield(x, key))
         end
@@ -191,15 +214,24 @@ for f in (:push!, :pushfirst!, :append!, :prepend!)
     end
 end
 
-function StatsBase.sample(s::BatchSampler, nt::NormalizedTraces, names, weights = StatsBase.UnitWeights{Int}(length(nt)))
+function StatsBase.sample(
+    s::BatchSampler,
+    nt::NormalizedTraces,
+    names,
+    weights = StatsBase.UnitWeights{Int}(length(nt)),
+)
     inds = StatsBase.sample(s.rng, 1:length(nt), weights, s.batchsize)
-    maybe_normalize(data, key) = key in keys(nt.normalizers) ? normalize(nt.normalizers[key], data) : data
+    maybe_normalize(data, key) =
+        key in keys(nt.normalizers) ? normalize(nt.normalizers[key], data) : data
     NamedTuple{names}(collect(maybe_normalize(nt[x][inds], x)) for x in names)
 end
 
 function Base.getindex(nt::NormalizedTraces, inds)
-    maybe_normalize(data, key) = key in keys(nt.normalizers) ? normalize(nt.normalizers[key], data) : data
-    NamedTuple{keys(nt.traces)}(collect(maybe_normalize(nt.traces[x][inds], x)) for x in keys(nt.traces))
+    maybe_normalize(data, key) =
+        key in keys(nt.normalizers) ? normalize(nt.normalizers[key], data) : data
+    NamedTuple{keys(nt.traces)}(
+        collect(maybe_normalize(nt.traces[x][inds], x)) for x in keys(nt.traces)
+    )
 end
 
 function Base.getindex(nt::NormalizedTraces, s::Symbol)

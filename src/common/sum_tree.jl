@@ -139,7 +139,7 @@ function correct_sample(t::SumTree, leaf_ind)
     p = t.tree[leaf_ind]
     # walk backwards until p != 0 or until leftmost leaf reached
     tmp_ind = leaf_ind
-    while iszero(p) && (tmp_ind-1)*2 > length(t.tree)
+    while iszero(p) && (tmp_ind - 1) * 2 > length(t.tree)
         tmp_ind -= 1
         p = t.tree[tmp_ind]
     end
@@ -151,7 +151,7 @@ function correct_sample(t::SumTree, leaf_ind)
     end
     return p, tmp_ind
 end
- 
+
 
 function Base.get(t::SumTree, v)
     parent_ind = 1
@@ -185,7 +185,7 @@ Random.rand(t::SumTree) = rand(Random.GLOBAL_RNG, t)
 
 function Random.rand(rng::AbstractRNG, t::SumTree{T}, n::Int) where {T}
     inds, priorities = Vector{Int}(undef, n), Vector{T}(undef, n)
-    for i in 1:n
+    for i = 1:n
         v = (i - 1 + rand(rng, T)) / n
         ind, p = get(t, v * t.tree[1])
         inds[i] = ind
