@@ -17,8 +17,8 @@ function CircularArraySARTSTraces(;
     state=Int => (),
     action=Int => (),
     reward=Float32 => (),
-    terminal=Bool => ())
-    
+    terminal=Bool => ()
+)
     state_eltype, state_size = state
     action_eltype, action_size = action
     reward_eltype, reward_size = reward
@@ -32,4 +32,4 @@ function CircularArraySARTSTraces(;
     )
 end
 
-CircularArrayBuffers.capacity(t::CircularArraySARTSTraces) = CircularArrayBuffers.capacity(minimum(map(capacity,t.traces)))
+CircularArrayBuffers.capacity(t::CircularArraySARTSTraces) = minimum(map(capacity,t.traces))

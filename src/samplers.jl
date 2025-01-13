@@ -93,10 +93,10 @@ export MetaSampler
 """
     MetaSampler(::NamedTuple)
 
-Wraps a NamedTuple containing multiple samplers. When sampled, returns a named tuple with a 
+Wraps a NamedTuple containing multiple samplers. When sampled, returns a named tuple with a
 batch from each sampler.
 Used internally for algorithms that sample multiple times per epoch.
-Note that a single "sampling" with a MetaSampler only increases the Trajectory controler 
+Note that a single "sampling" with a MetaSampler only increases the Trajectory controler
 count by 1, not by the number of internal samplers. This should be taken into account when
 initializing an agent.
 
@@ -131,15 +131,15 @@ export MultiBatchSampler
 """
     MultiBatchSampler(sampler, n)
 
-Wraps a sampler. When sampled, will sample n batches using sampler. Useful in combination 
+Wraps a sampler. When sampled, will sample n batches using sampler. Useful in combination
 with MetaSampler to allow different sampling rates between samplers.
-Note that a single "sampling" with a MultiBatchSampler only increases the Trajectory 
+Note that a single "sampling" with a MultiBatchSampler only increases the Trajectory
 controler count by 1, not by `n`. This should be taken into account when
 initializing an agent.
 
 # Example
 ```
-MetaSampler(policy = MultiBatchSampler(BatchSampler(10), 3), 
+MetaSampler(policy = MultiBatchSampler(BatchSampler(10), 3),
             critic = MultiBatchSampler(BatchSampler(100), 5))
 ```
 """
@@ -169,13 +169,13 @@ export NStepBatchSampler
     NStepBatchSampler{names}(; n, γ, batchsize=32, stacksize=nothing, rng=Random.GLOBAL_RNG)
 
 Used to sample a discounted sum of consecutive rewards in the framework of n-step TD learning.
-The "next" element of Multiplexed traces (such as the next_state or the next_action) will be 
+The "next" element of Multiplexed traces (such as the next_state or the next_action) will be
 that in up to `n > 1` steps later in the buffer. The reward will be
 the discounted sum of the `n` rewards, with `γ` as the discount factor.
 
-NStepBatchSampler may also be used with n ≥ 1 to sample a "stack" of states if `stacksize` is set 
+NStepBatchSampler may also be used with n ≥ 1 to sample a "stack" of states if `stacksize` is set
 to an integer > 1. This samples the (stacksize - 1) previous states. This is useful in the case
-of partial observability, for example when the state is approximated by `stacksize` consecutive 
+of partial observability, for example when the state is approximated by `stacksize` consecutive
 frames.
 """
 mutable struct NStepBatchSampler{names, S <: Union{Nothing,Int}, R <: AbstractRNG}
@@ -187,17 +187,17 @@ mutable struct NStepBatchSampler{names, S <: Union{Nothing,Int}, R <: AbstractRN
 end
 
 NStepBatchSampler(t::AbstractTraces; kw...) = NStepBatchSampler{keys(t)}(; kw...)
-function NStepBatchSampler{names}(; n, γ, batchsize=32, stacksize=nothing, rng=Random.default_rng()) where {names} 
+function NStepBatchSampler{names}(; n, γ, batchsize=32, stacksize=nothing, rng=Random.default_rng()) where {names}
     @assert n >= 1 "n must be ≥ 1."
     ss = stacksize == 1 ? nothing : stacksize
     NStepBatchSampler{names, typeof(ss), typeof(rng)}(n, γ, batchsize, ss, rng)
 end
 
 #return a boolean vector of the valid sample indices given the stacksize and the truncated n for each index.
-function valid_range(s::NStepBatchSampler, eb::EpisodesBuffer) 
+function valid_range(s::NStepBatchSampler, eb::EpisodesBuffer)
     range = copy(eb.sampleable_inds)
     ns = Vector{Int}(undef, length(eb.sampleable_inds))
-    stacksize = isnothing(s.stacksize) ? 1 : s.stacksize 
+    stacksize = isnothing(s.stacksize) ? 1 : s.stacksize
     for idx in eachindex(range)
         step_number = eb.step_numbers[idx]
         range[idx] = step_number >= stacksize && eb.sampleable_inds[idx]
@@ -258,9 +258,9 @@ end
 """
     EpisodesSampler()
 
-A sampler that samples all Episodes present in the Trajectory and divides them into 
+A sampler that samples all Episodes present in the Trajectory and divides them into
 Episode containers. Truncated Episodes (e.g. due to the buffer capacity) are sampled as well.
-There will be at most one truncated episode and it will always be the first one. 
+There will be at most one truncated episode and it will always be the first one.
 """
 struct EpisodesSampler{names}
 end
@@ -295,7 +295,7 @@ function StatsBase.sample(::EpisodesSampler, t::EpisodesBuffer, names)
             idx += 1
         end
     end
-    
+
     return [make_episode(t, r, names) for r in ranges]
 end
 
@@ -304,29 +304,29 @@ end
 """
     MultiStepSampler{names}(batchsize, n, stacksize, rng)
 
-Sampler that fetches steps `[x, x+1, ..., x + n -1]` for each trace of each sampled index 
-`x`. The samples are returned in an array of batchsize elements. For each element, n is 
-truncated by the end of its episode. This means that the dimensions of each sample are not 
-the same.  
+Sampler that fetches steps `[x, x+1, ..., x + n -1]` for each trace of each sampled index
+`x`. The samples are returned in an array of batchsize elements. For each element, n is
+truncated by the end of its episode. This means that the dimensions of each sample are not
+the same.
 """
 struct MultiStepSampler{names, S <: Union{Nothing,Int}, R <: AbstractRNG}
     n::Int
     batchsize::Int
     stacksize::S
-    rng::R 
+    rng::R
 end
 
 MultiStepSampler(t::AbstractTraces; kw...) = MultiStepSampler{keys(t)}(; kw...)
-function MultiStepSampler{names}(; n::Int, batchsize, stacksize=nothing, rng=Random.default_rng()) where {names} 
+function MultiStepSampler{names}(; n::Int, batchsize, stacksize=nothing, rng=Random.default_rng()) where {names}
     @assert n >= 1 "n must be ≥ 1."
     ss = stacksize == 1 ? nothing : stacksize
     MultiStepSampler{names, typeof(ss), typeof(rng)}(n, batchsize, ss, rng)
 end
 
-function valid_range(s::MultiStepSampler, eb::EpisodesBuffer) 
+function valid_range(s::MultiStepSampler, eb::EpisodesBuffer)
     range = copy(eb.sampleable_inds)
     ns = Vector{Int}(undef, length(eb.sampleable_inds))
-    stacksize = isnothing(s.stacksize) ? 1 : s.stacksize 
+    stacksize = isnothing(s.stacksize) ? 1 : s.stacksize
     for idx in eachindex(range)
         step_number = eb.step_numbers[idx]
         range[idx] = step_number >= stacksize && eb.sampleable_inds[idx]
@@ -353,7 +353,7 @@ function fetch(::MultiStepSampler, trace, ::Val, inds, ns)
     [trace[idx:(idx + ns[i] - 1)] for (i,idx) in enumerate(inds)]
 end
 
-function fetch(s::MultiStepSampler{names, Int}, trace::AbstractTrace, ::Union{Val{:state}, Val{:next_state}}, inds, ns) where {names} 
+function fetch(s::MultiStepSampler{names, Int}, trace::AbstractTrace, ::Union{Val{:state}, Val{:next_state}}, inds, ns) where {names}
     [trace[[idx + i + n - 1 for i in -s.stacksize+1:0, n in 1:ns[j]]] for (j,idx) in enumerate(inds)]
 end
 
