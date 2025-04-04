@@ -43,7 +43,13 @@ A `Trajectory` contains 3 parts:
 Typical usage:
 
 ```julia
-julia> t = Trajectory(Traces(a=Int[], b=Bool[]), BatchSampler(3), InsertSampleRatioControler(1.0, 3));
+julia> t = Trajectory(
+               container = Traces(a=Int[], b=Bool[]), 
+               sampler = BatchSampler(3), 
+               controller = InsertSampleRatioController(1.0, 3, 0, 0)
+           );
+
+julia> push!(t, (a=1,));
 
 julia> for i in 1:5
            push!(t, (a=i, b=iseven(i)))
@@ -52,9 +58,10 @@ julia> for i in 1:5
 julia> for batch in t
            println(batch)
        end
-(a = [4, 5, 1], b = Bool[1, 0, 0])
-(a = [3, 2, 4], b = Bool[0, 1, 1])
-(a = [4, 1, 2], b = Bool[1, 0, 1])
+(a = [1, 3, 1], b = Bool[1, 1, 1])
+(a = [4, 1, 4], b = Bool[0, 0, 0])
+(a = [1, 4, 1], b = Bool[1, 0, 0])
+(a = [1, 1, 4], b = Bool[1, 0, 0])
 ```
 
 **Traces**
